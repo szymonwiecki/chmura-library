@@ -93,6 +93,12 @@ namespace LibraryApi.Services
             await TryInvalidateAsync(id);
         }
 
+        public async Task UpdateStatusAsync(int id, ReadingStatus status)
+        {
+            await _inner.UpdateStatusAsync(id, status);
+            await TryInvalidateAsync(id);
+        }
+
         // Inwalidacja cache po operacji zapisu
         private async Task TryInvalidateAsync(int? id = null)
         {

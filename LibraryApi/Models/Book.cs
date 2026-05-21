@@ -31,5 +31,7 @@ namespace LibraryApi.Models
         public string? Notes { get; set; }
 
         public bool IsFavorite { get; set; } = false;
+
+        public ReadingStatus ReadingStatus { get; set; } = ReadingStatus.None;
     }
 }

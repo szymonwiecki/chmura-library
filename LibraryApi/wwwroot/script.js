@@ -7,10 +7,18 @@ const BOOK_TYPES = [
   { label: 'Audiobook', icon: '🎧', cls: 'type-audiobook' },
 ];
 
+const READING_STATUSES = [
+  { value: 0, label: 'Unread',  icon: '○',  cls: 'status-none'    },
+  { value: 1, label: 'To Read', icon: '📚', cls: 'status-toread'  },
+  { value: 2, label: 'Reading', icon: '📖', cls: 'status-reading' },
+  { value: 3, label: 'Read',    icon: '✓',  cls: 'status-read'    },
+];
+
 let token = '';
 let pendingDeleteId = null;
 let allBooks = [];
 let showFavoritesOnly = false;
+let statusFilter = null;
 
 /* ── Toast ─────────────────────────────────────────────────────── */
 function toast(message, type = 'success', duration = 3500) {
@@ -122,17 +130,43 @@ document.getElementById('login-form').addEventListener('submit', async e => {
 });
 
 /* ── Filter ────────────────────────────────────────────────────── */
+function setActiveFilter(activeId) {
+  ['filter-all-btn', 'filter-fav-btn', 'filter-toread-btn', 'filter-reading-btn', 'filter-read-btn']
+    .forEach(id => document.getElementById(id).classList.toggle('active', id === activeId));
+}
+
 document.getElementById('filter-all-btn').addEventListener('click', () => {
   showFavoritesOnly = false;
-  document.getElementById('filter-all-btn').classList.add('active');
-  document.getElementById('filter-fav-btn').classList.remove('active');
+  statusFilter = null;
+  setActiveFilter('filter-all-btn');
   renderBooks();
 });
 
 document.getElementById('filter-fav-btn').addEventListener('click', () => {
   showFavoritesOnly = true;
-  document.getElementById('filter-fav-btn').classList.add('active');
-  document.getElementById('filter-all-btn').classList.remove('active');
+  statusFilter = null;
+  setActiveFilter('filter-fav-btn');
+  renderBooks();
+});
+
+document.getElementById('filter-toread-btn').addEventListener('click', () => {
+  showFavoritesOnly = false;
+  statusFilter = 1;
+  setActiveFilter('filter-toread-btn');
+  renderBooks();
+});
+
+document.getElementById('filter-reading-btn').addEventListener('click', () => {
+  showFavoritesOnly = false;
+  statusFilter = 2;
+  setActiveFilter('filter-reading-btn');
+  renderBooks();
+});
+
+document.getElementById('filter-read-btn').addEventListener('click', () => {
+  showFavoritesOnly = false;
+  statusFilter = 3;
+  setActiveFilter('filter-read-btn');
   renderBooks();
 });
 
@@ -161,7 +195,9 @@ function renderBooks() {
   const empty = document.getElementById('empty-state');
   document.querySelectorAll('.book-card').forEach(c => c.remove());
 
-  const books = showFavoritesOnly ? allBooks.filter(b => b.isFavorite) : allBooks;
+  let books = allBooks;
+  if (showFavoritesOnly) books = books.filter(b => b.isFavorite);
+  if (statusFilter !== null) books = books.filter(b => (b.readingStatus ?? 0) === statusFilter);
   document.getElementById('book-count').textContent = books.length;
 
   if (books.length === 0) {
@@ -183,6 +219,8 @@ function getTypeIndex(bookType) {
 function buildBookCard(book) {
   const typeIdx = getTypeIndex(book.bookType);
   const type = BOOK_TYPES[typeIdx] || BOOK_TYPES[0];
+  const statusIdx = book.readingStatus ?? 0;
+  const status = READING_STATUSES[statusIdx] || READING_STATUSES[0];
 
   const card = document.createElement('div');
   card.className = 'book-card';
@@ -200,7 +238,10 @@ function buildBookCard(book) {
       </button>
     </div>
     <div class="book-body">
-      <span class="book-type-badge ${type.cls}">${type.icon} ${type.label}</span>
+      <div class="book-badges-row">
+        <span class="book-type-badge ${type.cls}">${type.icon} ${type.label}</span>
+        <button class="status-btn ${status.cls}" title="Click to change reading status">${status.icon} ${status.label}</button>
+      </div>
       <h3 class="book-title">${escapeHtml(book.title)}</h3>
       <p class="book-author">${escapeHtml(book.author)}</p>
       <div class="book-meta">
@@ -219,6 +260,10 @@ function buildBookCard(book) {
   card.querySelector('.star-btn').addEventListener('click', e => {
     e.stopPropagation();
     toggleFavorite(book, card.querySelector('.star-btn'));
+  });
+  card.querySelector('.status-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    cycleStatus(book, card.querySelector('.status-btn'));
   });
   card.querySelector('.btn-edit').addEventListener('click', e => {
     e.stopPropagation();
@@ -254,6 +299,38 @@ async function toggleFavorite(book, btn) {
   }
 }
 
+/* ── Reading status cycle ──────────────────────────────────────── */
+async function cycleStatus(book, btn) {
+  const nextIdx = ((book.readingStatus ?? 0) + 1) % READING_STATUSES.length;
+  try {
+    await apiJson('PATCH', `/api/Books/${book.id}/status`, { status: nextIdx });
+    book.readingStatus = nextIdx;
+    const s = READING_STATUSES[nextIdx];
+    btn.textContent = `${s.icon} ${s.label}`;
+    btn.className = `status-btn ${s.cls}`;
+    if (statusFilter !== null) renderBooks();
+  } catch (err) {
+    toast('Failed to update status: ' + err.message, 'error');
+  }
+}
+
+/* ── Export ────────────────────────────────────────────────────── */
+document.getElementById('export-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Exporting…';
+  try {
+    const data = await apiJson('POST', '/api/Books/export');
+    toast(`Exported ${data.count} books!`, 'success');
+    window.open(data.downloadUrl, '_blank');
+  } catch (err) {
+    toast('Export failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ Export';
+  }
+});
+
 /* ── Book Detail Modal ─────────────────────────────────────────── */
 function openDetailModal(book) {
   const typeIdx = getTypeIndex(book.bookType);
@@ -268,9 +345,13 @@ function openDetailModal(book) {
     coverEl.innerHTML = `<span class="detail-cover-icon">${type.icon}</span>`;
   }
 
+  const statusIdx = book.readingStatus ?? 0;
+  const status = READING_STATUSES[statusIdx] || READING_STATUSES[0];
+
   const badgesEl = document.getElementById('detail-badges');
   badgesEl.innerHTML =
     `<span class="book-type-badge ${type.cls}">${type.icon} ${type.label}</span>` +
+    (statusIdx > 0 ? `<span class="status-btn ${status.cls}" style="cursor:default">${status.icon} ${status.label}</span>` : '') +
     (book.isFavorite ? '<span class="fav-badge">⭐ Favorite</span>' : '');
 
   document.getElementById('detail-book-title').textContent = book.title;

@@ -20,6 +20,7 @@ namespace LibraryApi.Patterns.Observer
                 EventType = bookEvent.EventType.ToString(),
                 BookId = bookEvent.Book.Id,
                 BookTitle = bookEvent.Book.Title,
+                ReadingStatus = bookEvent.Book.ReadingStatus.ToString(),
                 OccurredAt = bookEvent.OccurredAt
             });
             await _serviceBus.SendMessageAsync(payload);

@@ -1,3 +1,6 @@
+using System.Text;
+using LibraryApi.Azure.BlobStorage;
+using LibraryApi.Azure.QueueStorage;
 using LibraryApi.Models;
 using LibraryApi.Patterns.Command;
 using LibraryApi.Patterns.Factory;
@@ -9,6 +12,7 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace LibraryApi.Controllers
 {
     public record GenerateDescriptionRequest(string Title, string Author, string Genre, int Year);
+    public record UpdateStatusRequest(ReadingStatus Status);
 
     [Route("api/[controller]")]
     [ApiController]
@@ -19,19 +23,25 @@ namespace LibraryApi.Controllers
         private readonly IBookFactory _factory;              // wzorzec Factory
         private readonly ICommandHistoryStore _historyStore; // Azure Table Storage
         private readonly IAiService _aiService;              // Claude AI
+        private readonly IBlobStorageService _blobService;   // Azure Blob Storage (eksport CSV)
+        private readonly IQueueService _queueService;        // Azure Queue Storage (zlecenia eksportu)
 
         public BooksController(
             IBookService bookService,
             CommandInvoker invoker,
             IBookFactory factory,
             ICommandHistoryStore historyStore,
-            IAiService aiService)
+            IAiService aiService,
+            IBlobStorageService blobService,
+            IQueueService queueService)
         {
             _bookService  = bookService;
             _invoker      = invoker;
             _factory      = factory;
             _historyStore = historyStore;
             _aiService    = aiService;
+            _blobService  = blobService;
+            _queueService = queueService;
         }
 
         [Authorize]
@@ -170,6 +180,58 @@ namespace LibraryApi.Controllers
                 return StatusCode(500, new { message = "AI generation failed", details = ex.Message });
             }
         }
+
+        // Status czytania - wysyła zdarzenie do Azure Service Bus (wzorzec Observer)
+        [Authorize]
+        [HttpPatch("{id}/status")]
+        [SwaggerOperation(Summary = "Update reading status", Description = "Updates reading status and publishes StatusChanged event to Azure Service Bus.")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusRequest req)
+        {
+            try
+            {
+                var existing = await _bookService.GetByIdAsync(id);
+                if (existing == null) return NotFound(new { message = "Book not found" });
+                await _bookService.UpdateStatusAsync(id, req.Status);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error updating status", details = ex.Message });
+            }
+        }
+
+        // Eksport katalogu - generuje CSV, zapisuje w Azure Blob Storage, kolejkuje zlecenie w Azure Queue
+        [Authorize]
+        [HttpPost("export")]
+        [SwaggerOperation(Summary = "Export book catalogue", Description = "Generates a CSV file, saves it to Azure Blob Storage and enqueues the job to Azure Queue Storage.")]
+        public async Task<IActionResult> ExportBooks()
+        {
+            try
+            {
+                var books = (await _bookService.GetAllAsync()).ToList();
+
+                var csv = new StringBuilder();
+                csv.AppendLine("Id,Title,Author,PublishedYear,Genre,BookType,ReadingStatus,IsFavorite");
+                foreach (var b in books)
+                    csv.AppendLine($"{b.Id},{EscapeCsv(b.Title)},{EscapeCsv(b.Author)},{b.PublishedYear},{EscapeCsv(b.Genre)},{b.BookType},{b.ReadingStatus},{b.IsFavorite}");
+
+                var fileName = $"library-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+                var downloadUrl = await _blobService.UploadTextAsync(csv.ToString(), fileName, "text/csv");
+
+                await _queueService.EnqueueAsync($"EXPORT:{books.Count}:{downloadUrl}");
+
+                return Ok(new { downloadUrl, count = books.Count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Export failed", details = ex.Message });
+            }
+        }
+
+        private static string EscapeCsv(string value) =>
+            value.Contains(',') || value.Contains('"') || value.Contains('\n')
+                ? $"\"{value.Replace("\"", "\"\"")}\""
+                : value;
 
         // Historia komend CRUD z Azure Table Storage (wzorzec Command)
         [Authorize]

@@ -70,10 +70,10 @@ builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddSingleton<IServiceBusService, ServiceBusService>();
 
-// Wzorzec Observer - publisher + 3 subskrybentów (logi, Queue, Service Bus)
+// Wzorzec Observer - publisher + 2 subskrybentów (logi, Service Bus)
+// Queue Storage obsługuje teraz tylko eksport - nie jest już subskrybentem CRUD
 builder.Services.AddSingleton<BookEventPublisher>();
 builder.Services.AddSingleton<IBookEventSubscriber, LoggingBookSubscriber>();
-builder.Services.AddSingleton<IBookEventSubscriber, QueueNotificationSubscriber>();
 builder.Services.AddSingleton<IBookEventSubscriber, ServiceBusSubscriber>();
 
 // Wzorzec Proxy - CachedBookService opakowuje BookService i dodaje Redis cache

@@ -75,5 +75,14 @@ namespace LibraryApi.Services
             book.IsFavorite = !book.IsFavorite;
             await _context.SaveChangesAsync();
         }
+
+        public async Task UpdateStatusAsync(int id, ReadingStatus status)
+        {
+            var book = await _context.Books.FindAsync(id);
+            if (book == null) return;
+            book.ReadingStatus = status;
+            await _context.SaveChangesAsync();
+            await _publisher.PublishAsync(new BookEvent { EventType = BookEventType.StatusChanged, Book = book });
+        }
     }
 }

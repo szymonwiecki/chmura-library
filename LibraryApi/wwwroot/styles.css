@@ -412,6 +412,36 @@ select { cursor: pointer; }
 .filter-btn:hover { border-color: var(--primary); color: var(--primary); }
 .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
+/* ── Reading status badge ───────────────────────────────────────── */
+.book-badges-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+  margin-bottom: .5rem;
+}
+.book-badges-row .book-type-badge { margin-bottom: 0; }
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .7rem;
+  font-weight: 600;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  transition: opacity .15s, transform .1s;
+  white-space: nowrap;
+}
+.status-btn:hover { opacity: .8; transform: scale(1.05); }
+.status-none    { background: #f1f5f9; color: #94a3b8; }
+.status-toread  { background: #dbeafe; color: #1d4ed8; }
+.status-reading { background: #fef3c7; color: #b45309; }
+.status-read    { background: #dcfce7; color: #15803d; }
+
 /* ── Star button ────────────────────────────────────────────────── */
 .book-cover { position: relative; }
 .star-btn {

@@ -10,5 +10,6 @@ namespace LibraryApi.Services
         Task<bool> UpdateAsync(int id, Book book);
         Task<bool> DeleteAsync(int id);
         Task ToggleFavoriteAsync(int id);
+        Task UpdateStatusAsync(int id, ReadingStatus status);
     }
 }

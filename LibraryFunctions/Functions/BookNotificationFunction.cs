@@ -4,8 +4,8 @@ using System.Text;
 
 namespace LibraryFunctions.Functions
 {
-    // Consumer side of Producer-Consumer pattern
-    // Triggered by Azure Queue Storage messages sent from LibraryApi (QueueService)
+    // Przetwarza zlecenia eksportu z Azure Queue Storage
+    // Wiadomość format: EXPORT:{count}:{blobUrl}
     public class BookNotificationFunction
     {
         private readonly ILogger<BookNotificationFunction> _logger;
@@ -19,7 +19,6 @@ namespace LibraryFunctions.Functions
         public void Run(
             [QueueTrigger("book-notifications", Connection = "AzureWebJobsStorage")] string message)
         {
-            // Messages from QueueService are base64-encoded
             string decoded;
             try
             {
@@ -30,27 +29,22 @@ namespace LibraryFunctions.Functions
                 decoded = message;
             }
 
-            _logger.LogInformation("[Consumer] Processing queue message: {Message}", decoded);
-
-            var parts = decoded.Split(':', 3);
-            if (parts.Length == 3)
+            if (decoded.StartsWith("EXPORT:"))
             {
-                var eventType = parts[0];
-                var bookId = parts[1];
-                var bookTitle = parts[2];
-
-                _logger.LogInformation("[Consumer] Event={EventType}, BookId={BookId}, Title={BookTitle}",
-                    eventType, bookId, bookTitle);
-
-                SendNotificationEmail(eventType, bookTitle);
+                var parts = decoded.Split(':', 3);
+                if (parts.Length == 3 && int.TryParse(parts[1], out var count))
+                {
+                    _logger.LogInformation("[Export] Job processed: {Count} books exported. File available at: {Url}", count, parts[2]);
+                }
+                else
+                {
+                    _logger.LogWarning("[Export] Malformed export message: {Message}", decoded);
+                }
             }
-        }
-
-        private void SendNotificationEmail(string eventType, string bookTitle)
-        {
-            // Miejsce na integrację z SendGrid / Azure Communication Services
-            _logger.LogInformation("[Email] Book '{BookTitle}' was {EventType} — notification sent.",
-                bookTitle, eventType.ToLower());
+            else
+            {
+                _logger.LogInformation("[Queue] Unrecognized message: {Message}", decoded);
+            }
         }
     }
 }

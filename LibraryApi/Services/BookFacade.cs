@@ -1,6 +1,5 @@
-// Wzorzec Facade - upraszcza interfejs łącząc BookService + BlobStorageService + QueueService
+// Wzorzec Facade - upraszcza interfejs łącząc BookService + BlobStorageService
 using LibraryApi.Azure.BlobStorage;
-using LibraryApi.Azure.QueueStorage;
 using LibraryApi.Models;
 
 namespace LibraryApi.Services
@@ -9,22 +8,11 @@ namespace LibraryApi.Services
     {
         private readonly BookService _bookService;
         private readonly IBlobStorageService _blobService;
-        private readonly IQueueService _queueService;
 
-        public BookFacade(BookService bookService, IBlobStorageService blobService, IQueueService queueService)
+        public BookFacade(BookService bookService, IBlobStorageService blobService)
         {
             _bookService = bookService;
             _blobService = blobService;
-            _queueService = queueService;
-
-            // Wzorzec Event - subskrypcja na BookAdded, wysyła powiadomienie do Azure Queue
-            _bookService.BookAdded += OnBookAdded;
-        }
-
-        // Handler eventu - wywoływany automatycznie po dodaniu każdej książki
-        private void OnBookAdded(Book book)
-        {
-            _ = _queueService.EnqueueAsync($"Added:{book.Id}:{book.Title}");
         }
 
         // Fasada: dodanie książki razem z okładką w jednej operacji

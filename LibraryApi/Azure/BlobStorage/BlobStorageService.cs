@@ -53,6 +53,12 @@ namespace LibraryApi.Azure.BlobStorage
             return sasUri.ToString();
         }
 
+        public async Task<string> UploadTextAsync(string content, string fileName, string contentType)
+        {
+            using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+            return await UploadAsync(stream, fileName, contentType);
+        }
+
         public async Task DeleteAsync(string blobName)
         {
             var container = await GetContainerAsync();
