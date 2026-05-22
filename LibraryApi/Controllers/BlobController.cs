@@ -1,4 +1,5 @@
-// Azure Blob Storage - upload okładek przez BookFacade (wzorzec Facade)
+// Azure Blob Storage - upload okładek książek
+using LibraryApi.Azure.BlobStorage;
 using LibraryApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +12,13 @@ namespace LibraryApi.Controllers
     [Authorize]
     public class BlobController : ControllerBase
     {
-        private readonly BookFacade _facade; // Facade łączy BookService + BlobStorageService
+        private readonly IBlobStorageService _blobService;
+        private readonly IBookService _bookService;
 
-        public BlobController(BookFacade facade)
+        public BlobController(IBlobStorageService blobService, IBookService bookService)
         {
-            _facade = facade;
+            _blobService = blobService;
+            _bookService = bookService;
         }
 
         [HttpPost]
@@ -28,7 +31,15 @@ namespace LibraryApi.Controllers
             try
             {
                 using var stream = file.OpenReadStream();
-                var url = await _facade.UploadCoverAsync(id, stream, file.FileName, file.ContentType);
+                var url = await _blobService.UploadAsync(stream, file.FileName, file.ContentType);
+
+                var book = await _bookService.GetByIdAsync(id);
+                if (book != null)
+                {
+                    book.CoverImageUrl = url;
+                    await _bookService.UpdateAsync(id, book);
+                }
+
                 return Ok(new { coverUrl = url });
             }
             catch (Exception ex)

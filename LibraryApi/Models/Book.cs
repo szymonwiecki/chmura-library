@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using LibraryApi.Patterns.Factory;
-
 namespace LibraryApi.Models
 {
     public class Book

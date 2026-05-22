@@ -3,7 +3,6 @@ using LibraryApi.Azure.BlobStorage;
 using LibraryApi.Azure.QueueStorage;
 using LibraryApi.Models;
 using LibraryApi.Patterns.Command;
-using LibraryApi.Patterns.Factory;
 using LibraryApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +19,6 @@ namespace LibraryApi.Controllers
     {
         private readonly IBookService _bookService;          // wzorzec Proxy: CachedBookService → BookService
         private readonly CommandInvoker _invoker;            // wzorzec Command
-        private readonly IBookFactory _factory;              // wzorzec Factory
         private readonly ICommandHistoryStore _historyStore; // Azure Table Storage
         private readonly IAiService _aiService;              // Claude AI
         private readonly IBlobStorageService _blobService;   // Azure Blob Storage (eksport CSV)
@@ -29,7 +27,6 @@ namespace LibraryApi.Controllers
         public BooksController(
             IBookService bookService,
             CommandInvoker invoker,
-            IBookFactory factory,
             ICommandHistoryStore historyStore,
             IAiService aiService,
             IBlobStorageService blobService,
@@ -37,7 +34,6 @@ namespace LibraryApi.Controllers
         {
             _bookService  = bookService;
             _invoker      = invoker;
-            _factory      = factory;
             _historyStore = historyStore;
             _aiService    = aiService;
             _blobService  = blobService;
@@ -86,10 +82,17 @@ namespace LibraryApi.Controllers
 
             try
             {
-                var newBook = _factory.Create(book.Title, book.Author, book.PublishedYear, book.Genre, book.BookType);
-                newBook.Description   = book.Description;
-                newBook.Notes         = book.Notes;
-                newBook.CoverImageUrl = book.CoverImageUrl;
+                var newBook = new Book
+                {
+                    Title         = book.Title,
+                    Author        = book.Author,
+                    PublishedYear = book.PublishedYear,
+                    Genre         = book.Genre,
+                    BookType      = book.BookType,
+                    Description   = book.Description,
+                    Notes         = book.Notes,
+                    CoverImageUrl = book.CoverImageUrl
+                };
 
                 var command = new AddBookCommand(_bookService, newBook);
                 await _invoker.ExecuteAsync(command);

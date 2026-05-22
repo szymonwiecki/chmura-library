@@ -5,7 +5,6 @@ using LibraryApi.Azure.ServiceBus;
 using LibraryApi.Data;
 using LibraryApi.Models;
 using LibraryApi.Patterns.Command;
-using LibraryApi.Patterns.Factory;
 using LibraryApi.Patterns.Observer;
 using LibraryApi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -70,10 +69,8 @@ builder.Services.AddSingleton<IBlobStorageService, BlobStorageService>();
 builder.Services.AddSingleton<IQueueService, QueueService>();
 builder.Services.AddSingleton<IServiceBusService, ServiceBusService>();
 
-// Wzorzec Observer - publisher + 2 subskrybentów (logi, Service Bus)
-// Queue Storage obsługuje teraz tylko eksport - nie jest już subskrybentem CRUD
+// Wzorzec Observer - publisher + subskrybent Service Bus
 builder.Services.AddSingleton<BookEventPublisher>();
-builder.Services.AddSingleton<IBookEventSubscriber, LoggingBookSubscriber>();
 builder.Services.AddSingleton<IBookEventSubscriber, ServiceBusSubscriber>();
 
 // Wzorzec Proxy - CachedBookService opakowuje BookService i dodaje Redis cache
@@ -94,12 +91,6 @@ builder.Services.AddScoped<IGoogleBooksService>(sp =>
         sp.GetRequiredService<GoogleBooksService>(),
         sp.GetRequiredService<IConnectionMultiplexer>(),
         sp.GetRequiredService<ILogger<CachedGoogleBooksService>>()));
-
-// Wzorzec Factory - tworzenie obiektów Book (BookCreator, EbookCreator, AudiobookCreator, PaperBookCreator)
-builder.Services.AddSingleton<IBookFactory, BookFactory>();
-
-// Wzorzec Facade - łączy BookService + BlobStorageService + QueueService + obsługuje event BookAdded
-builder.Services.AddScoped<BookFacade>();
 
 // Wzorzec Command - historia operacji CRUD zapisywana w Azure Table Storage
 builder.Services.AddSingleton<ICommandHistoryStore, AzureTableCommandHistoryStore>();

@@ -1,4 +1,4 @@
-namespace LibraryApi.Patterns.Factory
+namespace LibraryApi.Models
 {
     public enum BookType
     {
